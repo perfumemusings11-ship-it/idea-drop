@@ -282,7 +282,7 @@
           throw new Error(`HTTP ${res.status}`);
         }
       } catch (err) {
-        setStatus('Send failed — check your webhook URL in settings', 'error');
+        setStatus('Error: ' + err.message, 'error');
         setTimeout(() => setStatus('Press and hold to capture your idea'), 5000);
       }
     }
