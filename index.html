@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#0f0f0f" />
+  <title>Idea Drop</title>
+  <link rel="manifest" href="manifest.json" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0f0f0f;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    .logo {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: #555;
+      margin-bottom: 60px;
+    }
+
+    .btn-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 48px;
+    }
+
+    /* Pulsing rings during recording */
+    .ring {
+      position: absolute;
+      border-radius: 50%;
+      border: 2px solid rgba(220, 38, 38, 0.4);
+      opacity: 0;
+      pointer-events: none;
+      transition: none;
+    }
+    .ring-1 { width: 180px; height: 180px; }
+    .ring-2 { width: 230px; height: 230px; }
+    .ring-3 { width: 280px; height: 280px; }
+
+    @keyframes pulseRing {
+      0%   { opacity: 0.6; transform: scale(0.95); }
+      100% { opacity: 0;   transform: scale(1.1); }
+    }
+
+    .recording .ring-1 { animation: pulseRing 1.4s ease-out infinite; }
+    .recording .ring-2 { animation: pulseRing 1.4s ease-out 0.35s infinite; }
+    .recording .ring-3 { animation: pulseRing 1.4s ease-out 0.7s infinite; }
+
+    #recordBtn {
+      width: 140px;
+      height: 140px;
+      border-radius: 50%;
+      border: none;
+      background: #1a1a1a;
+      box-shadow: 0 0 0 4px #2a2a2a;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      transition: transform 0.1s ease, box-shadow 0.2s ease;
+      -webkit-tap-highlight-color: transparent;
+      position: relative;
+      z-index: 1;
+    }
+
+    #recordBtn:active { transform: scale(0.95); }
+
+    #recordBtn.recording {
+      background: #dc2626;
+      box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.3);
+    }
+
+    #recordBtn svg {
+      width: 40px;
+      height: 40px;
+      color: #888;
+      transition: color 0.2s;
+    }
+
+    #recordBtn.recording svg { color: #fff; }
+
+    #btnLabel {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #555;
+      transition: color 0.2s;
+    }
+
+    #recordBtn.recording #btnLabel { color: rgba(255,255,255,0.8); }
+
+    #timer {
+      font-size: 32px;
+      font-weight: 300;
+      letter-spacing: 0.05em;
+      color: #333;
+      font-variant-numeric: tabular-nums;
+      transition: color 0.3s;
+      min-height: 40px;
+    }
+
+    #timer.active { color: #dc2626; }
+
+    #status {
+      margin-top: 24px;
+      font-size: 14px;
+      color: #444;
+      text-align: center;
+      min-height: 48px;
+      padding: 0 32px;
+      line-height: 1.5;
+      transition: color 0.3s;
+    }
+
+    #status.success { color: #22c55e; }
+    #status.error   { color: #ef4444; }
+    #status.sending { color: #f59e0b; }
+
+    .history-toggle {
+      position: fixed;
+      bottom: 28px;
+      right: 28px;
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      color: #555;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 10px 18px;
+      border-radius: 999px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Settings for webhook URL */
+    #settingsPanel {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: #0f0f0f;
+      z-index: 100;
+      padding: 48px 24px 32px;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    #settingsPanel.open { display: flex; }
+
+    #settingsPanel h2 {
+      font-size: 16px;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    #settingsPanel p {
+      font-size: 13px;
+      color: #666;
+      line-height: 1.6;
+    }
+
+    #settingsPanel input {
+      width: 100%;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 10px;
+      padding: 14px;
+      color: #fff;
+      font-size: 14px;
+      outline: none;
+    }
+
+    #settingsPanel input:focus { border-color: #555; }
+
+    .btn-save {
+      background: #dc2626;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 14px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+
+    .btn-close {
+      background: #1a1a1a;
+      color: #888;
+      border: none;
+      border-radius: 10px;
+      padding: 14px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .settings-gear {
+      position: fixed;
+      top: 28px;
+      right: 28px;
+      background: none;
+      border: none;
+      color: #333;
+      cursor: pointer;
+      padding: 8px;
+      -webkit-tap-highlight-color: transparent;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="logo">Idea Drop</div>
+
+  <div class="btn-wrap" id="btnWrap">
+    <div class="ring ring-1"></div>
+    <div class="ring ring-2"></div>
+    <div class="ring ring-3"></div>
+    <button id="recordBtn" aria-label="Record idea">
+      <!-- Mic icon -->
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
+        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+        <line x1="12" y1="19" x2="12" y2="22"/>
+        <line x1="8" y1="22" x2="16" y2="22"/>
+      </svg>
+      <span id="btnLabel">Hold</span>
+    </button>
+  </div>
+
+  <div id="timer">0:00</div>
+  <div id="status">Press and hold to capture your idea</div>
+
+  <!-- Settings gear -->
+  <button class="settings-gear" onclick="openSettings()" aria-label="Settings">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+    </svg>
+  </button>
+
+  <!-- Settings Panel -->
+  <div id="settingsPanel">
+    <h2>Settings</h2>
+    <p>Paste your Make.com webhook URL below. Every recording gets sent here for processing.</p>
+    <input type="url" id="webhookInput" placeholder="https://hook.us1.make.com/..." autocomplete="off" />
+    <button class="btn-save" onclick="saveSettings()">Save</button>
+    <button class="btn-close" onclick="closeSettings()">Cancel</button>
+  </div>
+
+  <script>
+    // ── State ──────────────────────────────────────────────────────────────────
+    let mediaRecorder = null;
+    let audioChunks  = [];
+    let timerInterval = null;
+    let secondsElapsed = 0;
+    let isRecording = false;
+    let stream = null;
+
+    const recordBtn = document.getElementById('recordBtn');
+    const btnWrap   = document.getElementById('btnWrap');
+    const btnLabel  = document.getElementById('btnLabel');
+    const timerEl   = document.getElementById('timer');
+    const statusEl  = document.getElementById('status');
+
+    // ── Settings ───────────────────────────────────────────────────────────────
+    function getWebhook() {
+      return localStorage.getItem('ideadrop_webhook') || '';
+    }
+
+    function openSettings() {
+      document.getElementById('webhookInput').value = getWebhook();
+      document.getElementById('settingsPanel').classList.add('open');
+    }
+
+    function closeSettings() {
+      document.getElementById('settingsPanel').classList.remove('open');
+    }
+
+    function saveSettings() {
+      const val = document.getElementById('webhookInput').value.trim();
+      localStorage.setItem('ideadrop_webhook', val);
+      closeSettings();
+      setStatus('Webhook saved ✓', 'success');
+      setTimeout(() => setStatus('Press and hold to capture your idea'), 2000);
+    }
+
+    // Show settings on first load if no webhook set
+    window.addEventListener('load', () => {
+      if (!getWebhook()) {
+        setTimeout(openSettings, 600);
+      }
+    });
+
+    // ── Helpers ────────────────────────────────────────────────────────────────
+    function setStatus(msg, type = '') {
+      statusEl.className = type;
+      statusEl.textContent = msg;
+    }
+
+    function formatTime(s) {
+      const m = Math.floor(s / 60);
+      const sec = s % 60;
+      return `${m}:${sec.toString().padStart(2, '0')}`;
+    }
+
+    function startTimer() {
+      secondsElapsed = 0;
+      timerEl.textContent = '0:00';
+      timerEl.classList.add('active');
+      timerInterval = setInterval(() => {
+        secondsElapsed++;
+        timerEl.textContent = formatTime(secondsElapsed);
+      }, 1000);
+    }
+
+    function stopTimer() {
+      clearInterval(timerInterval);
+      timerEl.classList.remove('active');
+    }
+
+    // ── Recording ──────────────────────────────────────────────────────────────
+    async function startRecording() {
+      if (isRecording) return;
+
+      const webhook = getWebhook();
+      if (!webhook) {
+        openSettings();
+        return;
+      }
+
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (e) {
+        setStatus('Microphone access denied — check your browser settings', 'error');
+        return;
+      }
+
+      audioChunks = [];
+      mediaRecorder = new MediaRecorder(stream);
+
+      mediaRecorder.ondataavailable = e => {
+        if (e.data.size > 0) audioChunks.push(e.data);
+      };
+
+      mediaRecorder.onstop = () => sendRecording();
+
+      mediaRecorder.start();
+      isRecording = true;
+
+      recordBtn.classList.add('recording');
+      btnWrap.classList.add('recording');
+      btnLabel.textContent = 'Release';
+      setStatus('Listening… release when done');
+      startTimer();
+    }
+
+    function stopRecording() {
+      if (!isRecording) return;
+      isRecording = false;
+      mediaRecorder.stop();
+      stream.getTracks().forEach(t => t.stop());
+      stopTimer();
+      recordBtn.classList.remove('recording');
+      btnWrap.classList.remove('recording');
+      btnLabel.textContent = 'Hold';
+    }
+
+    // ── Send to Make.com ───────────────────────────────────────────────────────
+    async function sendRecording() {
+      if (audioChunks.length === 0) {
+        setStatus('Nothing recorded — try again', 'error');
+        return;
+      }
+
+      const blob = new Blob(audioChunks, { type: 'audio/webm' });
+
+      if (secondsElapsed < 2) {
+        setStatus('Too short — hold the button while you talk', 'error');
+        setTimeout(() => setStatus('Press and hold to capture your idea'), 3000);
+        return;
+      }
+
+      setStatus('Sending your idea to Claude…', 'sending');
+
+      const formData = new FormData();
+      formData.append('audio', blob, `idea-${Date.now()}.webm`);
+      formData.append('timestamp', new Date().toISOString());
+
+      try {
+        const res = await fetch(getWebhook(), {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (res.ok) {
+          setStatus('✓ Idea captured! Claude is on it.', 'success');
+          timerEl.textContent = '0:00';
+          setTimeout(() => setStatus('Press and hold to capture your idea'), 4000);
+        } else {
+          throw new Error(`HTTP ${res.status}`);
+        }
+      } catch (err) {
+        setStatus('Send failed — check your webhook URL in settings', 'error');
+        setTimeout(() => setStatus('Press and hold to capture your idea'), 5000);
+      }
+    }
+
+    // ── Button Events ──────────────────────────────────────────────────────────
+    // Touch (mobile)
+    recordBtn.addEventListener('touchstart', e => {
+      e.preventDefault();
+      startRecording();
+    }, { passive: false });
+
+    recordBtn.addEventListener('touchend', e => {
+      e.preventDefault();
+      stopRecording();
+    }, { passive: false });
+
+    // Mouse (desktop testing)
+    recordBtn.addEventListener('mousedown', e => {
+      e.preventDefault();
+      startRecording();
+    });
+
+    recordBtn.addEventListener('mouseup', e => {
+      e.preventDefault();
+      stopRecording();
+    });
+
+    // Safety: release if finger leaves the button
+    recordBtn.addEventListener('touchcancel', () => stopRecording());
+    document.addEventListener('mouseup', () => { if (isRecording) stopRecording(); });
+  </script>
+</body>
+</html>
